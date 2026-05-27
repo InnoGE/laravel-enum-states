@@ -17,6 +17,10 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: main
+          # PAT from a repo admin so the changelog commit can push to the
+          # protected main branch (default GITHUB_TOKEN cannot bypass protection).
+          # git-auto-commit-action reuses these persisted credentials to push.
+          token: ${{ secrets.CHANGELOG_PAT }}
 
       - name: Update Changelog
         uses: stefanzweifel/changelog-updater-action@v1
