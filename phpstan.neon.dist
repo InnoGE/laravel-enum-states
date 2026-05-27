@@ -1,0 +1,10 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: max
+    paths:
+        - src
+        - tests/Fixtures
+        - tests/EnumStatesTest.php
+    tmpDir: build/phpstan
