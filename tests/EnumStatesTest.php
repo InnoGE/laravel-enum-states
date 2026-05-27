@@ -18,8 +18,10 @@ use InnoGE\LaravelEnumStates\Tests\Fixtures\HtmlLabelStatus;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\LeavingPaid;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\MismatchedCastOrder;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\MissingCastOrder;
+use InnoGE\LaravelEnumStates\Tests\Fixtures\MultiFieldNestedSaveOrder;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\MultiPureOrder;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\MultiStatusOrder;
+use InnoGE\LaravelEnumStates\Tests\Fixtures\NestedSaveStatus;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\NoDefaultOrder;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\NoDefaultStatus;
 use InnoGE\LaravelEnumStates\Tests\Fixtures\Order;
@@ -136,6 +138,55 @@ it('accepts valid transitions through native enum assignment', function (): void
         ->and(StateActionLog::$entries[0]['to'])->toBe(OrderStatus::Paid)
         ->and(StateActionLog::$entries[0]['field'])->toBe('status')
         ->and(StateActionLog::$entries[0]['context'])->toBe([]);
+});
+
+it('allows transition actions to save the same model without replaying the transition', function (): void {
+    $order = Order::create();
+
+    fixtureOrderStatus($order)->transitionTo($order, 'status', OrderStatus::Paid, save_inside_action: true);
+    $order->save();
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Paid)
+        ->and(StateActionLog::$entries)->toHaveCount(1)
+        ->and(StateActionLog::$entries[0]['context'])->toBe(['save_inside_action' => true]);
+});
+
+it('syncs the persisted state before running transition actions', function (): void {
+    $order = Order::create();
+
+    fixtureOrderStatus($order)->transitionTo($order, 'status', OrderStatus::Paid, record_dirty_inside_action: true);
+    $order->save();
+
+    expect(StateActionLog::$entries)->toHaveCount(2)
+        ->and(StateActionLog::$entries[1]['action'])->toBe('dirty')
+        ->and(StateActionLog::$entries[1]['dirty'])->not->toHaveKey('status');
+});
+
+it('syncs all persisted state fields before running any transition action', function (): void {
+    $order = MultiFieldNestedSaveOrder::create();
+
+    NestedSaveStatus::Open->transitionTo($order, 'status', NestedSaveStatus::Done, save_inside_action: true);
+    NestedSaveStatus::Open->transitionTo($order, 'review_status', NestedSaveStatus::Done);
+    $order->save();
+
+    expect($order->refresh()->status)->toBe(NestedSaveStatus::Done)
+        ->and($order->refresh()->review_status)->toBe(NestedSaveStatus::Done)
+        ->and(StateActionLog::$entries)->toHaveCount(2)
+        ->and(array_column(StateActionLog::$entries, 'field'))->toBe(['status', 'review_status']);
+});
+
+it('treats state changes saved inside transition actions as transitions from the running target state', function (): void {
+    $order = Order::create();
+
+    fixtureOrderStatus($order)->transitionTo($order, 'status', OrderStatus::Paid, cancel_inside_action: true);
+    $order->save();
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Cancelled)
+        ->and(array_column(StateActionLog::$entries, 'action'))->toBe(['class', 'leaving', 'closure'])
+        ->and(StateActionLog::$entries[1]['from'])->toBe(OrderStatus::Paid)
+        ->and(StateActionLog::$entries[1]['to'])->toBe(OrderStatus::Cancelled)
+        ->and(StateActionLog::$entries[2]['from'])->toBe(OrderStatus::Paid)
+        ->and(StateActionLog::$entries[2]['to'])->toBe(OrderStatus::Cancelled);
 });
 
 it('treats direct creation into a non-default state as a transition from the default', function (): void {

@@ -51,18 +51,26 @@ final class StateMachineHandler
 
     public function saved(Model $model): void
     {
-        try {
-            $invoker = new ActionInvoker($this->container);
+        $transitions = $this->pending[$model] ?? [];
 
-            foreach ($this->pending[$model] ?? [] as $transition) {
-                $registration = StateMachineRegistry::forField($model, $transition->field);
+        $this->forget($model);
 
-                foreach ($registration->machine->actionsFor($transition->from, $transition->to) as $action) {
-                    $invoker->invoke($action, $transition);
-                }
+        $invoker = new ActionInvoker($this->container);
+
+        foreach ($transitions as $transition) {
+            // `saved` fires before Eloquent's finishSave() runs syncOriginal(), so the model's
+            // original still holds the pre-save value here. Rebase every transitioned field now
+            // so a save() from inside an action computes from the just-persisted state instead
+            // of replaying this transition.
+            $model->syncOriginalAttribute($transition->field);
+        }
+
+        foreach ($transitions as $transition) {
+            $registration = StateMachineRegistry::forField($model, $transition->field);
+
+            foreach ($registration->machine->actionsFor($transition->from, $transition->to) as $action) {
+                $invoker->invoke($action, $transition);
             }
-        } finally {
-            $this->forget($model);
         }
     }
 
