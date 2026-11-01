@@ -4,6 +4,7 @@ namespace InnoGE\LaravelEnumStates\Filament;
 
 use Closure;
 use Filament\Forms\Components\Select;
+use Illuminate\Database\Eloquent\Model;
 use InnoGE\LaravelEnumStates\Contracts\StateEnum;
 use InnoGE\LaravelEnumStates\Exceptions\InvalidStateMachineConfiguration;
 use InnoGE\LaravelEnumStates\StateOptions;
@@ -73,12 +74,21 @@ final class EnumStateSelect extends Select
             ? $this->evaluate($this->currentState)
             : $this->currentState;
 
-        $state ??= $this->getState();
+        $state ??= $this->persistedState();
 
         if (! $state instanceof StateEnum && ! is_string($state) && ! is_int($state) && $state !== null) {
             return null;
         }
 
         return StateOptions::currentState($enum, $state);
+    }
+
+    private function persistedState(): mixed
+    {
+        $record = $this->getRecord();
+
+        return $record instanceof Model
+            ? $record->getOriginal($this->getName())
+            : null;
     }
 }

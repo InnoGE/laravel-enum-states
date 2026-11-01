@@ -198,12 +198,12 @@ EnumStateSelect::make('status')
     ->stateEnum(OrderStatus::class);
 ```
 
-By default the field reads the live Livewire state. To base the options on the persisted record instead, pass the current state explicitly:
+The current state is the persisted value of the form's record, or the default state when there is no record yet (create forms). Changing the selection does not unlock further states before the record is saved, and Filament rejects a submitted state the record cannot transition to. To base the options on something else, pass the current state explicitly:
 
 ```php
 EnumStateSelect::make('status')
     ->stateEnum(OrderStatus::class)
-    ->currentState(fn (?Order $record): ?OrderStatus => $record?->status);
+    ->currentState(fn (?Order $record): ?OrderStatus => $record?->parentOrder?->status);
 ```
 
 </details>

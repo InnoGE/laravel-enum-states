@@ -372,6 +372,24 @@ it('supports Filament select edge cases', function (): void {
         ->and($invalidState->isOptionDisabled('paid', 'Paid'))->toBeFalse();
 });
 
+it('bases the Filament select on the persisted record state by default', function (): void {
+    $order = Order::create(['status' => OrderStatus::Paid]);
+    $order->status = OrderStatus::Cancelled;
+
+    $recordSelect = EnumStateSelect::make('status')
+        ->stateEnum(OrderStatus::class)
+        ->model($order);
+
+    $createSelect = EnumStateSelect::make('status')
+        ->stateEnum(OrderStatus::class)
+        ->model(Order::class);
+
+    expect($recordSelect->isOptionDisabled('pending', 'Pending'))->toBeTrue()
+        ->and($recordSelect->isOptionDisabled('shipped', 'Shipped'))->toBeFalse()
+        ->and($createSelect->isOptionDisabled('paid', 'Paid'))->toBeFalse()
+        ->and($createSelect->isOptionDisabled('shipped', 'Shipped'))->toBeTrue();
+});
+
 it('uses Laravel native enum query compatibility', function (): void {
     $pending = Order::create();
     $paid = Order::create(['status' => OrderStatus::Paid]);

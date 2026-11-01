@@ -112,7 +112,7 @@ final class StateMachineRegistry
                 $model,
                 $field,
                 $enum,
-                is_string($cast) ? $cast : get_debug_type($cast),
+                $cast,
             );
         }
     }
